@@ -12,10 +12,11 @@
   },
   "build": {
     "productName": "GeneDrugApp",
-    "directories": {
-      "output": "dist"
-    },
-    "extraResources": [
+   "directories": {
+     "output": "dist"
+   },
+    "electronDist": "./node_modules/electron/dist",
+   "extraResources": [
       {
         "from": "backend",
         "to": "backend"

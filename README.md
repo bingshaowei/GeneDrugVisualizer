@@ -1,4 +1,7 @@
-﻿# Gene Drug Visualizer
+﻿[![English](https://img.shields.io/badge/English-README-blue)](README.en.md)
+[![中文](https://img.shields.io/badge/中文-README-blue)](README.md)
+
+# Gene Drug Visualizer
 
 交互式桌面应用，用于探索基因表达与药物敏感性之间的关系，数据来自 **GDSC（Genomics of Drug Sensitivity in Cancer）** 项目。
 
