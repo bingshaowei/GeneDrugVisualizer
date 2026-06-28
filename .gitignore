@@ -1,6 +1,5 @@
 ﻿# Dependencies
 node_modules/
-README_files/libs/*
 
 # Build output
 frontend/build/
@@ -24,3 +23,5 @@ __pycache__/
 Thumbs.db
 backend/build/
 frontend/NotoSansSC-Regular.ttf
+
+README_files/
