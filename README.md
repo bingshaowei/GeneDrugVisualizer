@@ -10,6 +10,12 @@
 - **药物响应分析** — 查看 IC50、AUC、RMSE、Z_SCORE 等指标
 - **交互式界面** — 基于 React + Plotly，图表可缩放、悬停查看详情
 
+## 界面预览
+
+![搜索基因 TP53 与散点图](screenshot1.png)
+
+![药物详情表格与分组分析](screenshot2.png)
+
 ## 下载
 
 Windows 安装程序请前往 [Releases 页面](https://github.com/bingshaowei/GeneDrugVisualizer/releases) 下载。
@@ -17,6 +23,11 @@ Windows 安装程序请前往 [Releases 页面](https://github.com/bingshaowei/G
 **系统要求：**
 - Windows 10 / 11（64 位）
 - 无需额外安装软件 — Python 3.11 及所有依赖已内置
+
+## 文档
+
+- [用户手册](docs/用户手册.pdf)
+- [软件著作权证书](docs/软件证书.pdf)
 
 ## 开发
 
