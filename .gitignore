@@ -1,6 +1,6 @@
 ﻿# Dependencies
 node_modules/
-README_files/
+README_files/libs/*
 
 # Build output
 frontend/build/
