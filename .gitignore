@@ -1,0 +1,25 @@
+﻿# Dependencies
+node_modules/
+
+# Build output
+frontend/build/
+electron/dist/
+electron/backend/
+electron/frontend-build/
+electron/python-embedded/
+
+# Python
+__pycache__/
+*.pyc
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+backend/build/
+frontend/NotoSansSC-Regular.ttf

@@ -1,0 +1,42 @@
+{
+  "name": "gene-drug-electron",
+  "version": "1.0.0",
+  "description": "Electron app for gene-drug platform",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "copy-frontend": "cd ../frontend && npm install && npm run build && xcopy /E /I /Y build ../electron/backend/build"
+  },
+  "build": {
+    "productName": "GeneDrugApp",
+    "directories": {
+      "output": "dist"
+    },
+    "extraResources": [
+      {
+        "from": "backend",
+        "to": "backend"
+      },
+      {
+        "from": "python-embedded",
+        "to": "python-embedded"
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "sign": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
+  "devDependencies": {
+    "electron": "^27.1.0",
+    "electron-builder": "^23.6.0"
+  }
+}
