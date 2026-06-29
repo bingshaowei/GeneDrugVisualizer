@@ -29,7 +29,7 @@ Pre-built Windows installers are available on the [Releases page](https://github
 
 ## Documentation
 
-- [User Manual (Chinese)](docs/用户手册.pdf)
+- [User Manual (English)](docs/User Manual.docx)
 - [Software Copyright Certificate (Chinese)](docs/软件证书.pdf)
 
 ## Development
