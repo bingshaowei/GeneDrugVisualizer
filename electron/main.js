@@ -1,7 +1,6 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, dialog } = require('electron');
 const { spawn } = require('child_process');
-const path = require('path');
-const isDev = !app.isPackaged;
+const { SERVICE_URL, isAllowedNavigation, resolveRuntimePaths, waitForBackend } = require('./runtime');
 
 let mainWindow;
 let backendProcess;
@@ -11,21 +10,20 @@ function createWindow() {
     width: 1200,
     height: 800,
     webPreferences: {
-      contextIsolation: false,
-      nodeIntegration: true,
-      webSecurity: false,
-      allowRunningInsecureContent: true
+      nodeIntegration: false,
+      contextIsolation: true,
+      webSecurity: true,
+      allowRunningInsecureContent: false,
+      sandbox: true
     }
   });
 
-  // 加载本地 React 构建后的 index.html
-  const indexPath = path.join(
-    isDev ? __dirname : path.join(process.resourcesPath, 'backend'),
-    'build',
-    'index.html'
-  );
-  console.log(`✅ 加载页面: ${indexPath}`);
-  mainWindow.loadFile(indexPath);
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (!isAllowedNavigation(url)) event.preventDefault();
+  });
+  console.log(`✅ 加载页面: ${SERVICE_URL}`);
+  mainWindow.loadURL(SERVICE_URL);
 
   // 页面加载事件监听
   mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
@@ -37,16 +35,18 @@ function createWindow() {
   });
 }
 
-app.whenReady().then(() => {
-  const basePath = isDev ? __dirname : process.resourcesPath;
-  const pythonExec = path.join(basePath, 'python-embedded', 'python.exe');
-  const scriptPath = path.join(basePath, 'backend', 'app.py');
-  const backendDir = path.join(basePath, 'backend');
+app.whenReady().then(async () => {
+  const runtime = resolveRuntimePaths({ isPackaged: app.isPackaged, dirname: __dirname, resourcesPath: process.resourcesPath });
+  let backendAlive = true;
 
-  console.log(`✅ 启动 Python 后端: ${pythonExec}`);
-  console.log(`📂 后端目录: ${backendDir}`);
+  console.log(`✅ 启动 Python 后端: ${runtime.pythonExec}`);
+  console.log(`📂 后端目录: ${runtime.backendDir}`);
 
-  backendProcess = spawn(pythonExec, [scriptPath], { cwd: backendDir });
+  backendProcess = spawn(runtime.pythonExec, [runtime.scriptPath], {
+    cwd: runtime.backendDir,
+    env: { ...process.env, FRONTEND_BUILD_DIR: runtime.frontendBuildDir, PYTHONUNBUFFERED: '1' },
+    windowsHide: true,
+  });
 
   backendProcess.stdout.on('data', (data) => {
     console.log(`[Flask stdout] ${data}`);
@@ -57,14 +57,23 @@ app.whenReady().then(() => {
   });
 
   backendProcess.on('error', (err) => {
+    backendAlive = false;
     console.error('❌ Python 后端启动失败：', err);
   });
 
   backendProcess.on('exit', (code) => {
+    backendAlive = false;
     console.warn(`⚠️ Python 后端退出，退出码: ${code}`);
   });
 
-  createWindow();
+  try {
+    await waitForBackend({ isProcessAlive: () => backendAlive });
+    createWindow();
+  } catch (error) {
+    console.error('❌ 后端启动失败：', error);
+    dialog.showErrorBox('Gene Drug Visualizer 启动失败', `${error.message}\n\n请确认 Python 运行时和数据文件完整。`);
+    app.quit();
+  }
 });
 
 app.on('window-all-closed', () => {

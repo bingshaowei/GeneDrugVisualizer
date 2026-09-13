@@ -71,16 +71,10 @@ cd frontend
 npm install && npm run build
 cd ..
 
-# 2. 准备 electron 目录
-xcopy /E /I /Y frontend\build electron\backend\build
-xcopy /Y backend\app.py electron\backend\
-xcopy /Y backend\requirements.txt electron\backend\
-xcopy /E /I /Y backend\data electron\backend\data
-
-# 3. 下载 Python 嵌入版
+# 2. 准备 Python 嵌入版及固定依赖
 scripts\download-python.bat
 
-# 4. 打包
+# 3. 打包（electron-builder 直接收集 backend 与 frontend/build）
 cd electron
 npm install
 npx electron-builder --win
