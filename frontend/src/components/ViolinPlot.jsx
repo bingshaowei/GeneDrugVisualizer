@@ -1,6 +1,7 @@
 // src/components/ViolinPlot.jsx
 import React from 'react';
-import Plot from 'react-plotly.js';
+import Plot from 'react-plotly.js';
+import { normalizeViolinGroups } from '../analytics';
 
 const ViolinPlot = ({ data, selectedItems, groupBy = 'histology', gene, detailedData, cellLineMapping = {} }) => {
   if (!data || Object.keys(data).length === 0) return <p className="text-gray-500">暂无小提琴图数据</p>;
@@ -113,8 +114,9 @@ const ViolinPlot = ({ data, selectedItems, groupBy = 'histology', gene, detailed
       }
     });
     
-    processedData = newData;
-    processedDetailedData = newDetailedData;
+    const normalized = normalizeViolinGroups(data, detailedData, groupBy);
+    processedData = normalized.data;
+    processedDetailedData = normalized.details;
   }
 
   const traces = Object.entries(processedData).map(([category, values], idx) => {

@@ -71,16 +71,10 @@ cd frontend
 npm install && npm run build
 cd ..
 
-# 2. Prepare electron directory
-xcopy /E /I /Y frontend\build electron\backend\build
-xcopy /Y backend\app.py electron\backend\
-xcopy /Y backend\requirements.txt electron\backend\
-xcopy /E /I /Y backend\data electron\backend\data
-
-# 3. Download Python embedded
+# 2. Prepare embedded Python and pinned dependencies
 scripts\download-python.bat
 
-# 4. Build Electron installer
+# 3. Build the installer (electron-builder collects backend and frontend/build directly)
 cd electron
 npm install
 npx electron-builder --win

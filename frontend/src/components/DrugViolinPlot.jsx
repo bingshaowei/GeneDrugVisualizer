@@ -1,6 +1,6 @@
 import React from 'react';
 import Plot from 'react-plotly.js';
-import { jStat } from 'jstat';
+import { welchTTest } from '../analytics';
 
 const DrugViolinPlot = ({ data, drugName, metric }) => {
   if (!data || !drugName || !data.high || !data.low) {
@@ -91,14 +91,8 @@ const DrugViolinPlot = ({ data, drugName, metric }) => {
   // p值计算（两独立样本 t 检验）
   let annotation = null;
   try {
-    const n1 = highValues.length, n2 = lowValues.length;
-    const mean1 = jStat.mean(highValues), mean2 = jStat.mean(lowValues);
-    const var1 = jStat.variance(highValues), var2 = jStat.variance(lowValues);
-    const se = Math.sqrt(var1 / n1 + var2 / n2);
-    const t = Math.abs((mean1 - mean2) / se);
-    const df = Math.pow(var1 / n1 + var2 / n2, 2) /
-      (Math.pow(var1 / n1, 2) / (n1 - 1) + Math.pow(var2 / n2, 2) / (n2 - 1));
-    const p = 2 * (1 - jStat.studentt.cdf(t, df));
+    const p = welchTTest(highValues, lowValues);
+    if (p === null) throw new Error('样本不足或方差不可计算');
 
     let stars = 'ns';
     if (p < 0.0001) stars = '****';

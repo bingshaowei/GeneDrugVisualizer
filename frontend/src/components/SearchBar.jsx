@@ -5,29 +5,55 @@ export default function SearchBar({
   onSelectGene,
   defaultValue = 'TP53',              // 初始默认显示 TP53
   placeholder = '输入基因名称...',      // 删除内容后显示的提示
-  suggestions = [],                    // 可选：基因候选列表（用于下拉联想）
+  suggestions = [],                    // 可选：基因候选列表（用于下拉联想）
+  getSuggestions,
 }) {
   const [query, setQuery] = useState(defaultValue || '');
   const [open, setOpen] = useState(false);
-  const [highlight, setHighlight] = useState(0);
-  const inputRef = useRef(null);
+  const [highlight, setHighlight] = useState(0);
+  const [remoteSuggestions, setRemoteSuggestions] = useState([]);
+  const inputRef = useRef(null);
+  const blurTimerRef = useRef(null);
 
   // 父组件改变默认值时（例如切换默认基因），同步到输入框
-  useEffect(() => {
-    setQuery(defaultValue || '');
-  }, [defaultValue]);
+  useEffect(() => {
+    setQuery(defaultValue || '');
+  }, [defaultValue]);
+
+  useEffect(() => {
+    if (!getSuggestions) return undefined;
+    const trimmedQuery = query.trim();
+    if (!trimmedQuery) {
+      setRemoteSuggestions([]);
+      return undefined;
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      getSuggestions(trimmedQuery, { signal: controller.signal })
+        .then((items) => setRemoteSuggestions((items || []).slice(0, 10)))
+        .catch((error) => {
+          if (error.name !== 'AbortError') setRemoteSuggestions([]);
+        });
+    }, 250);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [getSuggestions, query]);
+
+  useEffect(() => () => clearTimeout(blurTimerRef.current), []);
 
   // 过滤出联想候选（先前缀匹配，再包含匹配），最多 10 个
   const filteredList = useMemo(() => {
     const q = (query || '').trim().toUpperCase();
     if (!q) return [];
-    const arr = (suggestions || []).map(String);
+    const arr = (getSuggestions ? remoteSuggestions : suggestions || []).map(String);
     const starts = arr.filter((g) => g.toUpperCase().startsWith(q));
     const contains = arr.filter(
       (g) => g.toUpperCase().includes(q) && !starts.includes(g)
     );
     return [...starts, ...contains].slice(0, 10);
-  }, [query, suggestions]);
+  }, [getSuggestions, query, remoteSuggestions, suggestions]);
 
   const commit = (value) => {
     const gene = (value || '').trim().toUpperCase();
@@ -66,7 +92,8 @@ export default function SearchBar({
 
   const onBlur = () => {
     // 延迟收起以允许点击下拉项
-    setTimeout(() => setOpen(false), 150);
+    clearTimeout(blurTimerRef.current);
+    blurTimerRef.current = setTimeout(() => setOpen(false), 150);
   };
 
   const clear = () => {

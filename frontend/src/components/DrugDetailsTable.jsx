@@ -1,6 +1,7 @@
 // src/components/DrugDetailsTable.jsx
 import React, { useEffect, useState } from 'react';
-import { jStat } from 'jstat';
+import { jStat } from 'jstat';
+import { sampleStandardDeviation, welchTTest } from '../analytics';
 
 function DrugDetailsTable({ drugName, expressionStats, correlationStats, currentMetric, violinData }) {
   const [drugDetails, setDrugDetails] = useState(null);
@@ -17,9 +18,11 @@ function DrugDetailsTable({ drugName, expressionStats, correlationStats, current
     setError(null);
 
     // 确保drugName是字符串格式，处理数字药物名称
-    const drugNameStr = String(drugName);
+    const drugNameStr = String(drugName);
+
+    const controller = new AbortController();
 
-    fetch(`http://127.0.0.1:5000/drug_details/${encodeURIComponent(drugNameStr)}`)
+    fetch(`/drug_details/${encodeURIComponent(drugNameStr)}`, { signal: controller.signal })
       .then(res => {
         if (!res.ok) throw new Error('药物信息未找到');
         return res.text(); // 先获取文本而不是直接解析JSON
@@ -36,11 +39,15 @@ function DrugDetailsTable({ drugName, expressionStats, correlationStats, current
         setDrugDetails(data);
         setLoading(false);
       })
-      .catch(err => {
+      .catch(err => {
+
+        if (err.name === 'AbortError') return;
         console.error('Drug details error:', err);
         setError(err.message);
         setLoading(false);
-      });
+      });
+
+    return () => controller.abort();
   }, [drugName]);
 
   // 计算药物在高低表达组中的分布差异p值
@@ -53,16 +60,7 @@ function DrugDetailsTable({ drugName, expressionStats, correlationStats, current
       
       if (highValues.length < 2 || lowValues.length < 2) return null;
       
-      const n1 = highValues.length, n2 = lowValues.length;
-      const mean1 = jStat.mean(highValues), mean2 = jStat.mean(lowValues);
-      const var1 = jStat.variance(highValues), var2 = jStat.variance(lowValues);
-      const se = Math.sqrt(var1 / n1 + var2 / n2);
-      const t = Math.abs((mean1 - mean2) / se);
-      const df = Math.pow(var1 / n1 + var2 / n2, 2) /
-        (Math.pow(var1 / n1, 2) / (n1 - 1) + Math.pow(var2 / n2, 2) / (n2 - 1));
-      const p = 2 * (1 - jStat.studentt.cdf(t, df));
-      
-      return p;
+      return welchTTest(highValues, lowValues);
     } catch (e) {
       console.warn('药物分组p值计算失败', e);
       return null;
@@ -80,9 +78,9 @@ function DrugDetailsTable({ drugName, expressionStats, correlationStats, current
       const lowValues = violinData.low.map(parseFloat).filter(v => !isNaN(v));
 
       const highMean = highValues.length > 0 ? jStat.mean(highValues) : null;
-      const highSD = highValues.length > 1 ? Math.sqrt(jStat.variance(highValues)) : null;
+      const highSD = sampleStandardDeviation(highValues);
       const lowMean = lowValues.length > 0 ? jStat.mean(lowValues) : null;
-      const lowSD = lowValues.length > 1 ? Math.sqrt(jStat.variance(lowValues)) : null;
+      const lowSD = sampleStandardDeviation(lowValues);
 
       return { highMean, highSD, lowMean, lowSD };
     } catch (e) {

@@ -6,7 +6,9 @@ import CorrelationScatterPlot from './components/CorrelationScatterPlot'; // 替
 import DrugViolinPlot from './components/DrugViolinPlot';
 import DrugDetailsTable from './components/DrugDetailsTable';
 import SelectWithAll from './components/SelectWithAll';
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { getAutocomplete, getDrugGroupSummary, getDrugResponse, getExpression } from './api';
+import { buildDrugViolinData, sampleStandardDeviation, welchTTest } from './analytics';
 
 const METRICS = [
   { value: 'Z_SCORE', label: 'Z_SCORE (Z分数)' },
@@ -19,7 +21,7 @@ const METRICS = [
 const METRIC_EXPLANATIONS = {
   'Z_SCORE': 'Z分数：衡量药物敏感性相对于平均水平的标准化得分。正值表示比平均水平更耐药，负值表示比平均水平更敏感。',
   'LN_IC50': 'LN_IC50：IC50值的自然对数。IC50是指抑制50%细胞生长所需的药物浓度，数值越小表示药物效果越好。',
-  'AUC': 'AUC：剂量-反应曲线下面积。反映药物在不同浓度下的总体抑制效果，数值越大表示药物效果越强。',
+  'AUC': 'AUC：剂量-反应曲线下面积。数值越小通常表示药物抑制作用越强、细胞越敏感。',
   'RMSE': 'RMSE：均方根误差。用于衡量药物反应预测模型的准确性，数值越小表示预测越准确。'
 };
 
@@ -49,7 +51,7 @@ function calculateTTest(group1, group2) {
   else if (absT > 2) p = 0.05;
   else p = 0.1;
   
-  return p;
+  return Number.isFinite(p) && df > 0 ? welchTTest(group1, group2) : null;
 }
 
 // 计算标准差
@@ -57,7 +59,7 @@ function calculateSD(values) {
   if (values.length < 2) return 0;
   const mean = values.reduce((a, b) => a + b, 0) / values.length;
   const variance = values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (values.length - 1);
-  return Math.sqrt(variance);
+  return Number.isFinite(variance) ? sampleStandardDeviation(values) : null;
 }
 
 function App() {
@@ -72,7 +74,9 @@ function App() {
   const [grouping, setGrouping] = useState('中位数');
   const [metric, setMetric] = useState('Z_SCORE');
   const [chartData, setChartData] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(null);
+  const [reloadToken, setReloadToken] = useState(0);
   const [sortByGroup, setSortByGroup] = useState('low'); // 默认低表达排序
   const [correlationStats, setCorrelationStats] = useState(null);
   
@@ -95,13 +99,16 @@ function App() {
   const [violinGroupBy, setViolinGroupBy] = useState('histology');
 
   // 新增：细胞系名称映射
-  const [cellLineMapping, setCellLineMapping] = useState({});
+  const [cellLineMapping, setCellLineMapping] = useState({});
+  const drugRequestControllerRef = useRef(null);
+  const drugRequestIdRef = useRef(0);
+  const summaryRequestIdRef = useRef(0);
 
   const handleGeneSelect = (gene) => {
     setSelectedGene(gene);
     // 添加到搜索历史（避免重复）
     if (!searchHistory.includes(gene)) {
-      setSearchHistory([...searchHistory, gene]);
+      setSearchHistory((current) => current.includes(gene) ? current : [...current, gene]);
     }
   };
 
@@ -134,7 +141,6 @@ function App() {
     setDrugViolinData(null);
     setViolinGroupBy('histology'); // 重置分组方式
     setCorrelationData({ expressionData: [], drugResponseData: [] });// 重置相关性数据
-    setCellLineMapping({}); // 重置细胞系映射
     setCorrelationStats(null);
   };
 
@@ -175,13 +181,18 @@ function App() {
   // 处理药物点击事件 - 修改为获取相关性分析数据
   // 在App.js中替换原有的handleDrugClick函数
 
-  const handleDrugClick = async (drugName) => {
+  const handleDrugClick = async (drugName) => {
     if (!chartData) return;
     
     console.log('Drug clicked:', drugName);
     setSelectedDrug(drugName);
     setCorrelationStats(null);
-    setLoading(true);
+    setLoading(true);
+    setLoadError(null);
+    drugRequestControllerRef.current?.abort();
+    const controller = new AbortController();
+    drugRequestControllerRef.current = controller;
+    const requestId = ++drugRequestIdRef.current;
 
     try {
       // 获取高低表达组的COSMIC_ID（用于小提琴图）
@@ -203,12 +214,20 @@ function App() {
       console.log('Low group IDs count:', lowGroupIds.length);
 
       // 获取所有样本的完整数据（用于相关性分析）
-      const allCosmicIds = filteredData.map(item => item.COSMIC_ID);
+      const allCosmicIds = filteredData.map(item => item.COSMIC_ID);
+      const drugRequest = getDrugResponse(allCosmicIds, metric, drugName, { signal: controller.signal });
+      const responseFor = (ids) => () => drugRequest.then((rows) => ({
+        ok: true,
+        json: async () => rows.filter((row) => ids.has(String(row.COSMIC_ID)))
+      }));
+      const highDrugFetch = responseFor(new Set(highGroupIds.map(String)));
+      const lowDrugFetch = responseFor(new Set(lowGroupIds.map(String)));
+      const allDrugFetch = responseFor(new Set(allCosmicIds.map(String)));
       console.log('All COSMIC IDs count:', allCosmicIds.length);
 
       // 并行请求数据
-      const [highDrugData, lowDrugData, allDrugData] = await Promise.all([
-        fetch('http://127.0.0.1:5000/drug_response', {
+      const [highDrugData, lowDrugData, allDrugData] = await Promise.all([
+        highDrugFetch('/drug_response', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
@@ -219,7 +238,7 @@ function App() {
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           return res.json();
         }),
-        fetch('http://127.0.0.1:5000/drug_response', {
+        lowDrugFetch('/drug_response', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
@@ -231,7 +250,7 @@ function App() {
           return res.json();
         }),
         // 获取所有指标的数据用于相关性分析
-        fetch('http://127.0.0.1:5000/drug_response', {
+        allDrugFetch('/drug_response', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
@@ -242,7 +261,9 @@ function App() {
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           return res.json();
         })
-      ]);
+      ]);
+
+      if (requestId !== drugRequestIdRef.current) return;
 
       console.log('High drug data count:', highDrugData.length);
       console.log('Low drug data count:', lowDrugData.length);
@@ -273,7 +294,9 @@ function App() {
           .map((item) => cellLineMapping[item.COSMIC_ID] || `ID: ${item.COSMIC_ID}`)
       });
 
-      // 验证相关性分析数据的有效性
+      setDrugViolinData(buildDrugViolinData(allDrugData, filteredData, highGroupIds, lowGroupIds, metric));
+
+      // 验证相关性分析数据的有效性
       console.log('Expression data for correlation:', filteredData.length);
       console.log('Drug response data for correlation:', allDrugData.length);
       
@@ -290,38 +313,46 @@ function App() {
         drugResponseData: allDrugData
       });
 
-    } catch (error) {
+    } catch (error) {
+
+      if (error.name === 'AbortError') return;
       console.error('获取药物数据失败:', error);
       // 提供更详细的错误信息
-      alert(`获取药物数据失败: ${error.message}`);
+      if (requestId === drugRequestIdRef.current) setLoadError(`获取药物数据失败: ${error.message}`);
     } finally {
-      setLoading(false);
+      if (requestId === drugRequestIdRef.current) setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (!selectedGene) return;
+    if (!selectedGene) return;
+    const controller = new AbortController();
     setCorrelationStats(null);
     setChartData(null);
     setSelectedDrug(null);
     setDrugViolinData(null);
     setCorrelationData({ expressionData: [], drugResponseData: [] }); // 重置相关性数据
-    setLoading(true);
+    setLoading(true);
+    setLoadError(null);
     
     // 同时获取表达数据和细胞系映射
     Promise.all([
-      fetch(`http://127.0.0.1:5000/expression/${encodeURIComponent(selectedGene)}`).then(res => res.json()),
-      fetch('http://127.0.0.1:5000/cell_line_map').then(res => res.json())
+      getExpression(selectedGene, { signal: controller.signal }),
+      Promise.resolve(null)
     ])
       .then(([expressionData, cellMapping]) => {
         setExprData(expressionData || []);
-        setCellLineMapping(cellMapping || {});
+        setCellLineMapping(Object.fromEntries(expressionData.map((item) => [String(item.COSMIC_ID), item.CELL_LINE])));
         
         // 获取所有COSMIC_ID，用于获取TCGA_DESC信息
         const cosmicIds = expressionData.map(item => item.COSMIC_ID);
         
         // 获取TCGA_DESC信息
-        return fetch('http://127.0.0.1:5000/drug_response', {
+        const localDrugFetch = () => Promise.resolve({
+          json: async () => expressionData.map((item) => ({ COSMIC_ID: item.COSMIC_ID, TCGA_DESC: item.TCGA_DESC }))
+        });
+
+        return localDrugFetch('/drug_response', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
@@ -364,12 +395,14 @@ function App() {
         setSortByGroup('low'); // 每次选择新基因时重置为低表达排序
         setViolinGroupBy('histology'); // 重置分组方式
       })
-      .catch((err) => {
-        console.error('Error fetching data:', err);
-        setCellLineMapping({}); // 错误时重置cellLineMapping
-        setLoading(false);
-      });
-  }, [selectedGene]);
+      .catch((err) => {
+        if (err.name === 'AbortError') return;
+        console.error('Error fetching data:', err);
+        setLoadError(`获取表达数据失败: ${err.message}`);
+        setLoading(false);
+      });
+    return () => controller.abort();
+  }, [selectedGene, reloadToken]);
 
   useEffect(() => {
     if (exprData.length === 0) return;
@@ -390,20 +423,39 @@ function App() {
     const { highGroupIds, lowGroupIds } = getGrouping(filteredData, values, grouping);
     
     const requestBodyHigh = { cosmic_ids: highGroupIds, metric };
-    const requestBodyLow = { cosmic_ids: lowGroupIds, metric };
-    setLoading(true);
+    const requestBodyLow = { cosmic_ids: lowGroupIds, metric };
+
+    const controller = new AbortController();
+    const requestId = ++summaryRequestIdRef.current;
+    const summaryRequest = getDrugGroupSummary(highGroupIds, lowGroupIds, metric, { signal: controller.signal })
+      .catch((error) => {
+        if (error.name !== 'AbortError') {
+          console.error('获取药物汇总失败:', error);
+          setLoadError(`获取药物汇总失败: ${error.message}`);
+        }
+        return [];
+      });
+    const highSummaryFetch = () => summaryRequest.then((rows) => ({
+      json: async () => rows.filter((row) => row.high_mean !== null).map((row) => ({ Drug_Name: row.drug_name, [metric]: row.high_mean }))
+    }));
+    const lowSummaryFetch = () => summaryRequest.then((rows) => ({
+      json: async () => rows.filter((row) => row.low_mean !== null).map((row) => ({ Drug_Name: row.drug_name, [metric]: row.low_mean }))
+    }));
+    setLoadError(null);
+    setLoading(true);
     Promise.all([
-      fetch('http://127.0.0.1:5000/drug_response', {
+      highSummaryFetch('/drug_group_summary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBodyHigh),
       }).then((res) => res.json()),
-      fetch('http://127.0.0.1:5000/drug_response', {
+      lowSummaryFetch('/drug_group_summary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBodyLow),
       }).then((res) => res.json()),
-    ]).then(([highData, lowData]) => {
+    ]).then(([highData, lowData]) => {
+      if (requestId !== summaryRequestIdRef.current) return;
       const highMap = {}, lowMap = {};
       highData.forEach((r) => {
         const v = parseFloat(r[metric]);
@@ -531,7 +583,8 @@ function App() {
     setSelectedDrug(null);
     setDrugViolinData(null);
     setCorrelationData({ expressionData: [], drugResponseData: [] }); // 重置相关性数据
-  }, [exprData, filterSite, filterHistology, filterTcga, grouping, metric, sortByGroup]); // 新增：filterTcga依赖
+    return () => controller.abort();
+  }, [exprData, filterSite, filterHistology, filterTcga, grouping, metric, sortByGroup, cellLineMapping]);
 
   // 生成PDF下载信息
   const getPdfInfo = () => {
@@ -569,7 +622,7 @@ return (
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
           <div className="w-[400px]">
-            <SearchBar onSelectGene={handleGeneSelect} defaultValue={selectedGene} placeholder="输入基因名称..." />
+            <SearchBar onSelectGene={handleGeneSelect} getSuggestions={getAutocomplete} defaultValue={selectedGene} placeholder="输入基因名称..." />
           </div>
           
           {/* 搜索历史按钮 */}
@@ -749,7 +802,14 @@ return (
             {/* 左侧：散点图 (1/3) */}
             <div className="col-span-1">
               {!selectedGene && <p className="text-gray-600">请选择一个基因以查看对应的药物响应图表。</p>}
-              {selectedGene && loading && <p className="text-gray-600">数据加载中，请稍候...</p>}
+              {selectedGene && loading && <p className="text-gray-600">数据加载中，请稍候...</p>}
+
+              {selectedGene && loadError && (
+                <div className="mb-3 rounded border border-red-200 bg-red-50 p-3 text-red-700">
+                  <span>{loadError}</span>
+                  <button type="button" className="ml-3 underline" onClick={() => setReloadToken((value) => value + 1)}>重试</button>
+                </div>
+              )}
               {selectedGene && !loading && chartData && chartData.drugNames.length === 0 && (
                 <p className="text-gray-600">当前筛选条件下没有足够的数据绘制图表。</p>
               )}

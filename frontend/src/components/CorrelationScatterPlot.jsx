@@ -1,7 +1,7 @@
 // src/components/CorrelationScatterPlot.jsx
 import React, { useState, useEffect } from 'react';
 import Plot from 'react-plotly.js';
-import { jStat } from 'jstat';
+import { pearsonCorrelation } from '../analytics';
 
 const CorrelationScatterPlot = ({ 
   selectedDrug, 
@@ -71,13 +71,17 @@ const CorrelationScatterPlot = ({
         return null;
       }
       
-      const r = numerator / denominator;
+      const correlation = pearsonCorrelation(x, y);
+
+      if (!correlation) return null;
+
+      const r = correlation.r;
       console.log(`  相关系数 r: ${r.toFixed(6)}`);
       
       // 计算t统计量和p值
       const t = r * Math.sqrt((n - 2) / (1 - r * r));
       const df = n - 2;
-      const p = 2 * (1 - jStat.studentt.cdf(Math.abs(t), df));
+      const p = correlation.p;
 
       console.log(`  t统计量: ${t.toFixed(6)}`);
       console.log(`  自由度: ${df}`);
@@ -106,7 +110,7 @@ const CorrelationScatterPlot = ({
       console.log(`🔄 同步指标更新: ${selectedCorrelationMetric} → ${currentMetric}`);
       setSelectedCorrelationMetric(currentMetric);
     }
-  }, [currentMetric]);
+  }, [currentMetric, selectedCorrelationMetric]);
 
   useEffect(() => {
     console.log('\n🔍 === 开始新的相关性分析 ===');
@@ -143,7 +147,7 @@ const CorrelationScatterPlot = ({
     setIsLoading(true);
 
     // 使用setTimeout确保状态更新
-    setTimeout(() => {
+    const calculationTimer = setTimeout(() => {
       try {
         const drugNameStr = String(selectedDrug);
         const drugSpecificData = drugResponseData.filter(item => String(item.Drug_Name) === drugNameStr);
@@ -245,7 +249,9 @@ const CorrelationScatterPlot = ({
         setIsLoading(false);
         console.log('🏁 === 相关性分析结束 ===\n');
       }
-    }, 100); // 100ms延迟确保状态更新
+    }, 100); // 100ms延迟确保状态更新
+
+    return () => clearTimeout(calculationTimer);
 
   }, [selectedDrug, expressionData, drugResponseData, selectedCorrelationMetric, cellLineMapping, onCorrelationCalculated]);
 

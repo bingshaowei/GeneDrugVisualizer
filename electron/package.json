@@ -8,7 +8,8 @@
     "dev": "electron .",
     "pack": "electron-builder --dir",
     "dist": "electron-builder",
-    "copy-frontend": "cd ../frontend && npm install && npm run build && xcopy /E /I /Y build ../electron/backend/build"
+    "copy-frontend": "cd ../frontend && npm install && npm run build",
+    "test": "node --test tests/*.test.js"
   },
   "build": {
     "productName": "GeneDrugApp",
@@ -18,8 +19,28 @@
     "electronDist": "./node_modules/electron/dist",
    "extraResources": [
       {
-        "from": "backend",
-        "to": "backend"
+        "from": "../backend/app.py",
+        "to": "backend/app.py"
+      },
+      {
+        "from": "../backend/api.py",
+        "to": "backend/api.py"
+      },
+      {
+        "from": "../backend/data_service.py",
+        "to": "backend/data_service.py"
+      },
+      {
+        "from": "../backend/requirements.txt",
+        "to": "backend/requirements.txt"
+      },
+      {
+        "from": "../backend/data",
+        "to": "backend/data"
+      },
+      {
+        "from": "../frontend/build",
+        "to": "backend/build"
       },
       {
         "from": "python-embedded",
