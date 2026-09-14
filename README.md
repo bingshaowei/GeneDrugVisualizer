@@ -36,7 +36,7 @@ Windows 安装程序请前往 [Releases 页面](https://github.com/bingshaowei/G
 
 ### 前置要求
 
-- Node.js 18+ 和 npm
+- Node.js 20.19+、22.12+ 或更高版本，以及 npm 11+
 - Python 3.11
 
 ### 快速开始
@@ -59,6 +59,8 @@ cd ..
 cd frontend && npm start
 ```
 
+前端开发服务器使用 Vite，固定监听 `http://127.0.0.1:3000`，并将 API 请求代理到本地 Flask 服务 `http://127.0.0.1:5000`。
+
 ### 构建安装包
 
 ```powershell
@@ -80,6 +82,8 @@ npm install
 npx electron-builder --win
 ```
 
+应用主图标位于 `electron/build/icon.png`，Electron Builder 会在打包时生成 Windows 所需图标格式。安装包输出到 `electron/dist`。
+
 ### 数据说明
 
 基因表达和药物敏感性数据来自 **GDSC（Genomics of Drug Sensitivity in Cancer）** v2 项目：
@@ -92,7 +96,7 @@ npx electron-builder --win
 
 | 层 | 技术 |
 |----|------|
-| 前端 | React 18, Plotly.js, Tailwind CSS |
+| 前端 | React 18, Vite 8, Plotly.js, Tailwind CSS |
 | 后端 | Python 3, Flask |
 | 桌面壳 | Electron 27, electron-builder |
 | 图表 | Plotly, ECharts |

@@ -5,6 +5,7 @@ import {
   sampleStandardDeviation,
   welchTTest,
 } from './analytics';
+import { expect, test } from 'vitest';
 
 test('样本标准差使用 n-1', () => {
   expect(sampleStandardDeviation([1, 2, 3])).toBeCloseTo(1, 10);

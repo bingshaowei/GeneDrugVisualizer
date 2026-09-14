@@ -2,6 +2,7 @@
   "name": "gene-drug-electron",
   "version": "1.1.0",
   "description": "Electron app for gene-drug platform",
+  "author": "Shaowei Bing",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -49,6 +50,7 @@
     ],
     "win": {
       "target": "nsis",
+      "icon": "build/icon.png",
       "sign": false
     },
     "nsis": {
@@ -60,5 +62,8 @@
   "devDependencies": {
     "electron": "^27.1.0",
     "electron-builder": "^23.6.0"
+  },
+  "allowScripts": {
+    "electron@27.3.11": true
   }
 }

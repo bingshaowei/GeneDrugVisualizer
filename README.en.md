@@ -36,7 +36,7 @@ Pre-built Windows installers are available on the [Releases page](https://github
 
 ### Prerequisites
 
-- Node.js 18+ and npm
+- Node.js 20.19+, 22.12+, or a newer release, plus npm 11+
 - Python 3.11
 
 ### Quick Start
@@ -59,6 +59,8 @@ cd ..
 cd frontend && npm start
 ```
 
+The frontend development server uses Vite at `http://127.0.0.1:3000` and proxies API requests to the local Flask service at `http://127.0.0.1:5000`.
+
 ### Build Installer
 
 ```powershell
@@ -80,6 +82,8 @@ npm install
 npx electron-builder --win
 ```
 
+The application master icon is stored at `electron/build/icon.png`. Electron Builder converts it to the Windows icon formats during packaging. Installers are written to `electron/dist`.
+
 ### Data Source
 
 Expression and drug sensitivity data are from the **GDSC (Genomics of Drug Sensitivity in Cancer)** v2 project:
@@ -92,7 +96,7 @@ Expression and drug sensitivity data are from the **GDSC (Genomics of Drug Sensi
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | React 18, Plotly.js, Tailwind CSS |
+| Frontend | React 18, Vite 8, Plotly.js, Tailwind CSS |
 | Backend | Python 3, Flask |
 | Desktop Shell | Electron 27, electron-builder |
 | Charts | Plotly, ECharts |
