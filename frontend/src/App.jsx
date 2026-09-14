@@ -613,7 +613,7 @@ return (
       <div className="flex items-center justify-between mb-4">
         {/* 左侧：标题和搜索图标 */}
         <div className="flex items-center gap-3">
-          <h1 className="text-xl font-semibold">Gene-drug Response (version 1.0)</h1>
+          <h1 className="text-xl font-semibold">Gene-drug Response (version 1.1.0)</h1>
         </div>
         
         {/* 中间：搜索框和搜索历史居中区域 */}

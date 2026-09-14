@@ -21,6 +21,15 @@ test('1.1 发布元数据包含作者和自定义 Windows 图标', () => {
   assert.ok([4, 6].includes(png[25]), 'PNG 必须包含透明通道');
 });
 
+test('界面显示版本与发布版本保持一致', () => {
+  const electronPackage = require(path.join(projectRoot, 'electron', 'package.json'));
+  const frontendPackage = require(path.join(projectRoot, 'frontend', 'package.json'));
+  const appSource = fs.readFileSync(path.join(projectRoot, 'frontend', 'src', 'App.jsx'), 'utf8');
+
+  assert.equal(frontendPackage.version, electronPackage.version);
+  assert.match(appSource, new RegExp(`version ${electronPackage.version.replaceAll('.', '\\.')}`));
+});
+
 test('安装脚本策略只允许必需脚本', () => {
   const electronPackage = require(path.join(projectRoot, 'electron', 'package.json'));
   const frontendPackage = require(path.join(projectRoot, 'frontend', 'package.json'));
