@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
-import ReactECharts from 'echarts-for-react';
+import ReactECharts from 'echarts-for-react';
+import * as echarts from 'echarts';
 import jsPDF from 'jspdf';
 
 function Chart({ 
@@ -77,7 +78,21 @@ function Chart({
   const exportChart = (type) => {
     const echartsInstance = chartRef.current.getEchartsInstance();
     const pixelRatio = type === 'png' ? 5 : 2;
-    const dataURL = echartsInstance.getDataURL({ type, pixelRatio, backgroundColor: '#fff' });
+    let dataURL;
+    if (type === 'svg') {
+      const svgChart = echarts.init(null, null, {
+        renderer: 'svg', ssr: true,
+        width: echartsInstance.getWidth(), height: echartsInstance.getHeight()
+      });
+      try {
+        svgChart.setOption({ ...echartsInstance.getOption(), animation: false, backgroundColor: '#fff' });
+        dataURL = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svgChart.renderToSVGString())}`;
+      } finally {
+        svgChart.dispose();
+      }
+    } else {
+      dataURL = echartsInstance.getDataURL({ type, pixelRatio, backgroundColor: '#fff' });
+    }
     const link = document.createElement('a');
     link.href = dataURL;
     link.download = `chart-export-${pixelRatio}x.${type}`;

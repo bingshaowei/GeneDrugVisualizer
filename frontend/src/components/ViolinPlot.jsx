@@ -162,7 +162,7 @@ const ViolinPlot = ({ data, selectedItems, groupBy = 'histology', gene, detailed
       <Plot
         data={traces}
         layout={{
-          title: `${gene || '基因'} 表达值分布（按 ${groupByLabels[groupBy]} 分类）`,
+          title: { text: `${gene || '基因'} 表达值分布（按 ${groupByLabels[groupBy]} 分类）` },
           xaxis: { 
             title: {
               text: groupByLabels[groupBy],

@@ -36,7 +36,7 @@ Windows 安装程序请前往 [Releases 页面](https://github.com/bingshaowei/G
 
 ### 前置要求
 
-- Node.js 20.19+、22.12+ 或更高版本，以及 npm 11+
+- Node.js 22.x（>=22.22.2）、24.x（>=24.15.0）或 26+，以及 npm 11+
 - Python 3.11
 
 ### 快速开始
@@ -67,22 +67,52 @@ cd frontend && npm start
 # 一键构建（推荐）
 scripts\build.bat
 
+# 使用独立输出目录进行发布验证
+scripts\build.bat electron\dist-verify-v1.1.1
+
 # 或手动分步执行：
-# 1. 构建前端
+# 1. 从项目根目录选择尚不存在的独立发布输出目录
+$releaseOutput = Join-Path (Get-Location) "electron\dist-verify-v1.1.1-manual"
+if (Test-Path -LiteralPath $releaseOutput) { throw "请选择尚不存在的发布输出目录。" }
+
+# 2. 安装锁定前端依赖，审计、测试并构建
 cd frontend
-npm install && npm run build
+npm ci
+if ($LASTEXITCODE -ne 0) { throw "前端依赖安装失败。" }
+npm run audit:security
+if ($LASTEXITCODE -ne 0) { throw "前端依赖审计失败。" }
+npm test
+if ($LASTEXITCODE -ne 0) { throw "前端测试失败。" }
+npm run build
+if ($LASTEXITCODE -ne 0) { throw "前端构建失败。" }
 cd ..
 
-# 2. 准备 Python 嵌入版及固定依赖
+# 3. 准备 Python 嵌入版及固定依赖
 scripts\download-python.bat
+if ($LASTEXITCODE -ne 0) { throw "Python 嵌入版准备失败。" }
 
-# 3. 打包（electron-builder 直接收集 backend 与 frontend/build）
+# 4. 安装锁定 Electron 依赖，审计、测试并打包
 cd electron
-npm install
-npx electron-builder --win
+npm ci
+if ($LASTEXITCODE -ne 0) { throw "Electron 依赖安装失败。" }
+npm run audit:security
+if ($LASTEXITCODE -ne 0) { throw "Electron 依赖审计失败。" }
+npm test
+if ($LASTEXITCODE -ne 0) { throw "Electron 测试失败。" }
+npx electron-builder --win --config.directories.output="$releaseOutput"
+if ($LASTEXITCODE -ne 0) { throw "安装程序构建失败。" }
+cd ..
+
+# 5. 验证独立目录中的发布产物
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\verify-release.ps1 -DistPath "$releaseOutput"
+if ($LASTEXITCODE -ne 0) { throw "发布产物验证失败。" }
 ```
 
-应用主图标位于 `electron/build/icon.png`，Electron Builder 会在打包时生成 Windows 所需图标格式。安装包输出到 `electron/dist`。
+一键构建会依次安装锁定依赖、运行前端和 Electron 测试、构建安装包并执行产物验证。输出目录必须为空；脚本不会自动删除或覆盖已有产物。默认安装包输出到 `electron/dist`，验证结果写入同目录的 `release-validation.json`。
+
+发布构建会在前端和 Electron 安装依赖后执行全量依赖安全审计，任意等级的漏洞告警都会导致构建失败。
+
+应用主图标位于 `electron/build/icon.png`，Electron Builder 会在打包时生成 Windows 所需图标格式。当前安装包未配置代码签名。
 
 ### 数据说明
 
@@ -98,7 +128,7 @@ npx electron-builder --win
 |----|------|
 | 前端 | React 18, Vite 8, Plotly.js, Tailwind CSS |
 | 后端 | Python 3, Flask |
-| 桌面壳 | Electron 27, electron-builder |
+| 桌面壳 | Electron 44, electron-builder |
 | 图表 | Plotly, ECharts |
 | 数据处理 | Pandas (CSV) |
 

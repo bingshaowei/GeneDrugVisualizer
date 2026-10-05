@@ -36,7 +36,7 @@ Pre-built Windows installers are available on the [Releases page](https://github
 
 ### Prerequisites
 
-- Node.js 20.19+, 22.12+, or a newer release, plus npm 11+
+- Node.js 22.x (>=22.22.2), 24.x (>=24.15.0), or 26+, plus npm 11+
 - Python 3.11
 
 ### Quick Start
@@ -67,22 +67,52 @@ The frontend development server uses Vite at `http://127.0.0.1:3000` and proxies
 # One-click build (recommended)
 scripts\build.bat
 
+# Use an isolated output directory for release validation
+scripts\build.bat electron\dist-verify-v1.1.1
+
 # Or step by step:
-# 1. Build frontend
+# 1. From the project root, choose a separate output directory that does not exist yet
+$releaseOutput = Join-Path (Get-Location) "electron\dist-verify-v1.1.1-manual"
+if (Test-Path -LiteralPath $releaseOutput) { throw "Choose a release output directory that does not exist yet." }
+
+# 2. Install locked frontend dependencies, audit, test, and build
 cd frontend
-npm install && npm run build
+npm ci
+if ($LASTEXITCODE -ne 0) { throw "Frontend dependency installation failed." }
+npm run audit:security
+if ($LASTEXITCODE -ne 0) { throw "Frontend dependency audit failed." }
+npm test
+if ($LASTEXITCODE -ne 0) { throw "Frontend tests failed." }
+npm run build
+if ($LASTEXITCODE -ne 0) { throw "Frontend build failed." }
 cd ..
 
-# 2. Prepare embedded Python and pinned dependencies
+# 3. Prepare embedded Python and pinned dependencies
 scripts\download-python.bat
+if ($LASTEXITCODE -ne 0) { throw "Embedded Python preparation failed." }
 
-# 3. Build the installer (electron-builder collects backend and frontend/build directly)
+# 4. Install locked Electron dependencies, audit, test, and build the installer
 cd electron
-npm install
-npx electron-builder --win
+npm ci
+if ($LASTEXITCODE -ne 0) { throw "Electron dependency installation failed." }
+npm run audit:security
+if ($LASTEXITCODE -ne 0) { throw "Electron dependency audit failed." }
+npm test
+if ($LASTEXITCODE -ne 0) { throw "Electron tests failed." }
+npx electron-builder --win --config.directories.output="$releaseOutput"
+if ($LASTEXITCODE -ne 0) { throw "Installer build failed." }
+cd ..
+
+# 5. Validate the release artifacts in the separate output directory
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\verify-release.ps1 -DistPath "$releaseOutput"
+if ($LASTEXITCODE -ne 0) { throw "Release artifact validation failed." }
 ```
 
-The application master icon is stored at `electron/build/icon.png`. Electron Builder converts it to the Windows icon formats during packaging. Installers are written to `electron/dist`.
+The one-command build installs locked dependencies, runs the frontend and Electron tests, builds the installer, and validates the packaged artifacts. The output directory must be empty; the script never deletes or overwrites existing artifacts. Installers are written to `electron/dist` by default, and validation evidence is saved as `release-validation.json` in the same directory.
+
+Release builds audit all dependencies after installing frontend and Electron dependencies; a vulnerability warning at any severity fails the build.
+
+The application master icon is stored at `electron/build/icon.png`. Electron Builder converts it to the Windows icon formats during packaging. The current installer is not code-signed.
 
 ### Data Source
 
@@ -98,7 +128,7 @@ Expression and drug sensitivity data are from the **GDSC (Genomics of Drug Sensi
 |-------|-----------|
 | Frontend | React 18, Vite 8, Plotly.js, Tailwind CSS |
 | Backend | Python 3, Flask |
-| Desktop Shell | Electron 27, electron-builder |
+| Desktop Shell | Electron 44, electron-builder |
 | Charts | Plotly, ECharts |
 | Data Processing | Pandas (CSV) |
 

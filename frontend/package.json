@@ -1,28 +1,25 @@
 {
   "name": "gene-drug-app",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "private": true,
   "dependencies": {
-    "autoprefixer": "^10.4.14",
-    "echarts": "^5.6.0",
-    "echarts-for-react": "^3.0.2",
-    "html2canvas": "^1.4.1",
-    "jspdf": "^3.0.1",
-    "jspdf-autotable": "^5.0.2",
+    "echarts": "6.1.0",
+    "echarts-for-react": "3.0.6",
+    "jspdf": "4.2.1",
     "jstat": "^1.9.6",
-    "plotly.js": "^3.0.1",
-    "plotly.js-dist-min": "^3.0.1",
-    "postcss": "^8.4.21",
+    "plotly.js": "4.1.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-plotly.js": "^2.6.0",
+    "react-plotly.js": "4.1.0",
     "react-select": "^5.10.1",
-    "simple-statistics": "^7.8.8",
-    "tailwindcss": "^3.3.0"
+    "simple-statistics": "^7.8.8"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "4.3.3",
     "@vitejs/plugin-react": "^6.1.1",
     "jsdom": "^30.0.1",
+    "postcss": "^8.4.21",
+    "tailwindcss": "4.3.3",
     "vite": "^8.3.0",
     "vitest": "^5.0.0"
   },
@@ -31,7 +28,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "audit:security": "npm audit --audit-level=low"
   },
   "allowScripts": {
     "core-js": false,

@@ -1,6 +1,6 @@
 {
   "name": "gene-drug-electron",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Electron app for gene-drug platform",
   "author": "Shaowei Bing",
   "main": "main.js",
@@ -10,15 +10,21 @@
     "pack": "electron-builder --dir",
     "dist": "electron-builder",
     "copy-frontend": "cd ../frontend && npm install && npm run build",
-    "test": "node --test tests/*.test.js"
+    "test": "node --test tests/*.test.js",
+    "audit:security": "npm audit --audit-level=low"
   },
   "build": {
+    "appId": "com.electron.gene-drug-electron",
     "productName": "GeneDrugApp",
-   "directories": {
-     "output": "dist"
-   },
-    "electronDist": "./node_modules/electron/dist",
-   "extraResources": [
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "runtime.js",
+      "package.json"
+    ],
+    "extraResources": [
       {
         "from": "../backend/app.py",
         "to": "backend/app.py"
@@ -51,7 +57,9 @@
     "win": {
       "target": "nsis",
       "icon": "build/icon.png",
-      "sign": false
+      "signtoolOptions": {
+        "sign": null
+      }
     },
     "nsis": {
       "oneClick": false,
@@ -60,10 +68,11 @@
     }
   },
   "devDependencies": {
-    "electron": "^27.1.0",
-    "electron-builder": "^23.6.0"
+    "@electron/asar": "3.4.1",
+    "electron": "44.5.1",
+    "electron-builder": "26.15.3"
   },
   "allowScripts": {
-    "electron@27.3.11": true
+    "electron@44.5.1": true
   }
 }
