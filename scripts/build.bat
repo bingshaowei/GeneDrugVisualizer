@@ -53,7 +53,7 @@ call npm run audit:security
 if %errorlevel% neq 0 exit /b %errorlevel%
 call npm test
 if %errorlevel% neq 0 exit /b %errorlevel%
-call npx electron-builder --win --x64 --config.directories.output="%OUTPUT_DIR%"
+call npx electron-builder --win --x64 --publish never --config.directories.output="%OUTPUT_DIR%"
 if %errorlevel% neq 0 exit /b %errorlevel%
 
 echo [5/5] Validating release artifacts and runtime...

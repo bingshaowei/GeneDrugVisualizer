@@ -107,7 +107,7 @@ npm run audit:security
 if ($LASTEXITCODE -ne 0) { throw "Electron audit failed." }
 npm test
 if ($LASTEXITCODE -ne 0) { throw "Electron tests failed." }
-npx electron-builder --win --x64 --config.directories.output="$releaseOutput"
+npx electron-builder --win --x64 --publish never --config.directories.output="$releaseOutput"
 if ($LASTEXITCODE -ne 0) { throw "Installer build failed." }
 cd ..
 

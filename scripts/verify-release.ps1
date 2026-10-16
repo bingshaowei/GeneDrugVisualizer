@@ -45,6 +45,8 @@ try {
         throw "Installer name mismatch: expected $expectedInstallerName, got $($installer.Name)"
     }
 
+    # Pin the built-in module to this interpreter, regardless of inherited PSModulePath.
+    Import-Module (Join-Path $PSHOME "Modules/Microsoft.PowerShell.Security/Microsoft.PowerShell.Security.psd1") -ErrorAction Stop
     $installerSignature = Get-AuthenticodeSignature -LiteralPath $installer.FullName
     if ($installerSignature.Status -ne "NotSigned") {
         throw "Installer signature status mismatch: expected NotSigned, got $($installerSignature.Status)"
@@ -166,6 +168,6 @@ try {
     Write-Output "Signing status: $($installerSignature.Status)"
     Write-Output "Validation record: $evidencePath"
 } catch {
-    Write-Error $_.Exception.Message
+    [Console]::Error.WriteLine($_.Exception.Message)
     exit 1
 }
