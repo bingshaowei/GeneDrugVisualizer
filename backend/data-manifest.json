@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "source": "git show HEAD:backend/data/{drug,expression}.csv (Git LFS oid and size)",
+  "files": {
+    "drug.csv": {
+      "size": 23194492,
+      "sha256": "2601980f666f1938a7dc92bc2b0f9d45b2de33112e4cb08804d0e38873e3b7dc",
+      "requiredColumns": [
+        "COSMIC_ID",
+        "DRUG_NAME",
+        "AUC",
+        "Z_SCORE",
+        "LN_IC50",
+        "RMSE"
+      ],
+      "encoding": "gbk"
+    },
+    "expression.csv": {
+      "size": 143270738,
+      "sha256": "7eb3eddab32fc4f3db259d14701f9018363dce8c2ac78727d13d6a74922bc721",
+      "requiredColumns": [
+        "TCGA_DESC",
+        "COSMIC_ID",
+        "CELL_LINE",
+        "site",
+        "histology",
+        "TP53"
+      ],
+      "encoding": "gbk"
+    }
+  }
+}
