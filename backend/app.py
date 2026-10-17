@@ -39,6 +39,10 @@ app = create_app(expression_df, drug_df, BUILD_DIR)
 
 # ====== 启动 ======
 if __name__ == '__main__':
+    # Redirected logs must support Chinese on every Windows system locale.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, 'reconfigure'):
+            stream.reconfigure(encoding='utf-8', errors='backslashreplace')
     print(f"Flask 启动成功！将在 {BUILD_DIR} 查找前端静态文件")
     app.run(host='127.0.0.1', port=5000, debug=False)
 

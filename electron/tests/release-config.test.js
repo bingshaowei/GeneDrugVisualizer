@@ -145,3 +145,28 @@ test('前端使用 Vite 并保持既有构建与代理接口', async () => {
   assert.equal(config.build.outDir, 'build');
   assert.equal(config.test.environment, 'jsdom');
 });
+
+test('前端锁定 source-map-js 1.2.2 修复 GHSA-68fv-2mgg-jv7q', () => {
+  const lock = require(path.join(projectRoot, 'frontend', 'package-lock.json'));
+  assert.equal(lock.packages['node_modules/source-map-js'].version, '1.2.2');
+});
+
+test('Electron 下载器使用无 sprintf-js 的兼容代理依赖', () => {
+  const pkg = require(path.join(projectRoot, 'electron', 'package.json'));
+  const lock = require(path.join(projectRoot, 'electron', 'package-lock.json'));
+  assert.deepEqual(pkg.overrides, { '@electron/get': { 'global-agent': '4.1.3' } });
+  assert.ok(!Object.keys(lock.packages).some((name) => name.endsWith('/sprintf-js')));
+});
+
+test('Electron builder 下载器可实际初始化代理', () => {
+  const { createRequire } = require('node:module');
+  const { spawnSync } = require('node:child_process');
+  const builderRequire = createRequire(require.resolve('app-builder-lib/package.json'));
+  const getPath = builderRequire.resolve('@electron/get');
+  const getRequire = createRequire(getPath);
+  assert.equal(getRequire('global-agent/package.json').version, '4.1.3');
+  const child = spawnSync(process.execPath, ['-e',
+    'require(' + JSON.stringify(getPath) + ').initializeProxy(); if (!global.GLOBAL_AGENT) throw new Error("Proxy did not initialize");'
+  ], { encoding: 'utf8' });
+  assert.equal(child.status, 0, child.stdout + child.stderr);
+});

@@ -1,4 +1,6 @@
-@import "tailwindcss";
+@import "tailwindcss" source(none);
+@source "./";
+@source "../index.html";
 @config "../tailwind.config.js";
 
 /* 可以在此处添加全局自定义样式或调整Tailwind基准样式 */

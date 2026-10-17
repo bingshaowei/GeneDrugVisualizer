@@ -74,5 +74,10 @@
   },
   "allowScripts": {
     "electron@44.5.1": true
+  },
+  "overrides": {
+    "@electron/get": {
+      "global-agent": "4.1.3"
+    }
   }
 }

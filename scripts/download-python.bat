@@ -1,40 +1,33 @@
-﻿@echo off
-setlocal enabledelayedexpansion
-set PYTHON_VERSION=3.11.9
-set PYTHON_URL=https://www.python.org/ftp/python/%PYTHON_VERSION%/python-%PYTHON_VERSION%-embed-amd64.zip
-set ELECTRON_DIR=%~dp0..\electron
-set TEMP_DIR=%TEMP%\python-embed-download
-echo ===== Download Python %PYTHON_VERSION% Embeddable =====
-mkdir "%TEMP_DIR%" 2>nul
-if not exist "%ELECTRON_DIR%\python-embedded\python.exe" (
-    echo Downloading from %PYTHON_URL%...
-    powershell -Command "Invoke-WebRequest -Uri '%PYTHON_URL%' -OutFile '%TEMP_DIR%\python.zip'"
-    if !errorlevel! neq 0 exit /b !errorlevel!
-    echo Extracting to electron/python-embedded/...
-    powershell -Command "Expand-Archive -Path '%TEMP_DIR%\python.zip' -DestinationPath '%ELECTRON_DIR%\python-embedded' -Force"
-    if !errorlevel! neq 0 exit /b !errorlevel!
-)
-set PYTHON_EXE=%ELECTRON_DIR%\python-embedded\python.exe
-set PTH_FILE=%ELECTRON_DIR%\python-embedded\python311._pth
-powershell -Command "(Get-Content -LiteralPath '%PTH_FILE%') -replace '^#import site$', 'import site' | Set-Content -LiteralPath '%PTH_FILE%' -Encoding ascii"
-"%PYTHON_EXE%" -c "import flask, pandas"
-if !errorlevel! neq 0 (
-    "%PYTHON_EXE%" -m pip --version >nul 2>&1
-    if !errorlevel! neq 0 (
-        echo Installing pip...
-        powershell -Command "Invoke-WebRequest -Uri 'https://bootstrap.pypa.io/get-pip.py' -OutFile '%TEMP_DIR%\get-pip.py'"
-        if !errorlevel! neq 0 exit /b !errorlevel!
-        "%PYTHON_EXE%" "%TEMP_DIR%\get-pip.py"
-        if !errorlevel! neq 0 exit /b !errorlevel!
-    )
-    echo Installing backend dependencies...
-    "%PYTHON_EXE%" -m pip install -r "%~dp0..\backend\requirements.txt"
-    if !errorlevel! neq 0 exit /b !errorlevel!
-    "%PYTHON_EXE%" -c "import flask, pandas"
-    if !errorlevel! neq 0 exit /b !errorlevel!
-)
-echo.
-echo ===== Done =====
-echo Python embedded path: %ELECTRON_DIR%\python-embedded
-echo.
-echo Python dependencies verified.
+@echo off
+setlocal
+set "PYTHON_DIR=%~dp0..\electron\python-embedded"
+set "PYTHON_EXE=%PYTHON_DIR%\python.exe"
+set "LOCK=%~dp0..\backend\requirements-release.lock"
+if exist "%PYTHON_DIR%" goto existing
+set "TEMP_DIR=%TEMP%\gene-python-%RANDOM%-%RANDOM%"
+if exist "%TEMP_DIR%" (echo Temporary path already exists. Retry. 1>&2 & exit /b 1)
+mkdir "%TEMP_DIR%"
+if errorlevel 1 exit /b 1
+echo Downloading Python 3.11.9 Windows x64; retained staging directory: %TEMP_DIR%
+powershell -NoProfile -Command "$ErrorActionPreference='Stop'; Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/3.11.9/python-3.11.9-embed-amd64.zip' -OutFile (Join-Path $env:TEMP_DIR 'python.zip'); Expand-Archive -LiteralPath (Join-Path $env:TEMP_DIR 'python.zip') -DestinationPath (Join-Path $env:TEMP_DIR 'runtime')"
+if errorlevel 1 goto failed
+set "STAGED_PYTHON=%TEMP_DIR%\runtime\python.exe"
+"%STAGED_PYTHON%" -c "import sys,struct; assert sys.version_info[:3] == (3,11,9) and sys.platform == 'win32' and struct.calcsize('P') == 8, 'Expected Python 3.11.9 Windows x64; actual: '+sys.version"
+if errorlevel 1 goto failed
+powershell -NoProfile -Command "$ErrorActionPreference='Stop'; Set-Content -LiteralPath (Join-Path $env:TEMP_DIR 'runtime/python311._pth') -Encoding ascii -Value @('python311.zip','.','Lib/site-packages','import site'); Invoke-WebRequest -Uri 'https://files.pythonhosted.org/packages/c9/bc/b7db44f5f39f9d0494071bddae6880eb645970366d0a200022a1a93d57f5/pip-25.0.1-py3-none-any.whl' -OutFile (Join-Path $env:TEMP_DIR 'pip.zip')"
+if errorlevel 1 goto failed
+"%STAGED_PYTHON%" -c "import hashlib,pathlib,zipfile,sys; p=pathlib.Path(sys.argv[1]); assert hashlib.sha256(p.read_bytes()).hexdigest() == 'c46efd13b6aa8279f33f2864459c8ce587ea6a1a59ee20de055868d8f7688f7f', 'pip 25.0.1 wheel SHA256 mismatch'; zipfile.ZipFile(p).extractall(sys.argv[2])" "%TEMP_DIR%\pip.zip" "%TEMP_DIR%\runtime\Lib\site-packages"
+if errorlevel 1 goto failed
+"%STAGED_PYTHON%" -m pip install --disable-pip-version-check --require-hashes --only-binary=:all: -r "%LOCK%"
+if errorlevel 1 goto failed
+"%STAGED_PYTHON%" -B "%~dp0check-python.py" --lock "%LOCK%"
+if errorlevel 1 goto failed
+powershell -NoProfile -Command "$ErrorActionPreference='Stop'; if (Test-Path -LiteralPath $env:PYTHON_DIR) {throw 'Destination appeared during setup; refusing overwrite'}; Copy-Item -LiteralPath (Join-Path $env:TEMP_DIR 'runtime') -Destination $env:PYTHON_DIR -Recurse"
+if errorlevel 1 goto failed
+:existing
+if not exist "%PYTHON_EXE%" (echo Expected Python 3.11.9 Windows x64; actual missing executable. Use a fresh checkout; existing directory is not modified. 1>&2 & exit /b 1)
+"%PYTHON_EXE%" -B "%~dp0check-python.py" --lock "%LOCK%"
+exit /b %errorlevel%
+:failed
+echo Python setup failed. Staging files retained at %TEMP_DIR%. Use a fresh checkout; existing environments are never repaired or overwritten. 1>&2
+exit /b 1

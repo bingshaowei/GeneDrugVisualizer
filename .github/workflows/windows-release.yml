@@ -1,0 +1,87 @@
+name: Windows release validation
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pull-request:
+    if: github.event_name == 'pull_request'
+    runs-on: windows-2022
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.18.0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: 3.11.9
+          architecture: x64
+      - name: Check npm version
+        run: |
+          $version = npm --version
+          if ($LASTEXITCODE -ne 0 -or [version]$version -lt [version]'11.0.0') { throw 'npm 11+ is required' }
+      - name: Install locked Python dependencies
+        run: |
+          python -m pip install --disable-pip-version-check --require-hashes --only-binary=:all: -r backend/requirements-release.lock
+          if ($LASTEXITCODE -ne 0) { throw 'Python dependency installation failed' }
+          python -B scripts/check-python.py --lock backend/requirements-release.lock
+          if ($LASTEXITCODE -ne 0) { throw 'Python dependency verification failed' }
+      - name: Backend and release validator tests
+        run: |
+          python -B -m unittest discover -s backend/tests -v
+          if ($LASTEXITCODE -ne 0) { throw 'Backend or release validator tests failed' }
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Audit frontend dependencies
+        working-directory: frontend
+        run: npm run audit:security
+      - name: Test frontend
+        working-directory: frontend
+        run: npm test
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+      - name: Install Electron dependencies
+        working-directory: electron
+        run: npm ci
+      - name: Audit Electron dependencies
+        working-directory: electron
+        run: npm run audit:security
+      - name: Test Electron and build tooling
+        working-directory: electron
+        run: npm test
+
+  full-build:
+    if: github.event_name != 'pull_request'
+    runs-on: windows-2022
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.18.0
+      - name: Check npm version
+        run: |
+          $version = npm --version
+          if ($LASTEXITCODE -ne 0 -or [version]$version -lt [version]'11.0.0') { throw 'npm 11+ is required' }
+      - name: Build and validate Windows x64 release
+        run: |
+          $output = Join-Path $env:RUNNER_TEMP ('gene-release-' + [guid]::NewGuid().ToString('N'))
+          & .\scripts\build.bat $output
+          if ($LASTEXITCODE -ne 0) { throw 'Release build or validation failed' }
